@@ -32,6 +32,7 @@ from service import app
 from service.common import status
 from service.models import db, init_db, Product
 from tests.factories import ProductFactory
+from urllib.parse import quote_plus
 
 # Disable all but critical errors during normal test run
 # uncomment for debugging failing tests
@@ -163,17 +164,7 @@ class TestProductRoutes(TestCase):
         response = self.client.post(BASE_URL, data={}, content_type="plain/text")
         self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
-    ######################################################################
-    # Utility functions
-    ######################################################################
 
-    def get_product_count(self):
-        """save the current number of products"""
-        response = self.client.get(BASE_URL)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        data = response.get_json()
-        # logging.debug("data = %s", data)
-        return len(data)
     #
     # ADD YOUR TEST CASES HERE
     #
@@ -185,13 +176,18 @@ class TestProductRoutes(TestCase):
         data = response.get_json()
         self.assertEqual(data["name"], test_product.name)
 
-    
+    def test_get_product_not_found(self):
+        """It should not Get a Product thats not found"""
+        response = self.client.get(f"{BASE_URL}/0")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        data = response.get_json()
+        self.assertIn("was not found", data["message"])
+
     def test_update_product(self):
         """It should Update an existing Product"""
         test_product = ProductFactory()
         response = self.client.post(f"{BASE_URL}", json=test_product.serialize())
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        
         # UPDATE THE PRODUCT
         new_product = response.get_json()
         new_product["description"] = "unknown"
@@ -200,43 +196,64 @@ class TestProductRoutes(TestCase):
         updated_product = response.get_json()
         self.assertEqual(updated_product['description'], "unknown")
 
-    ######################################################################
-    # DELETE A PRODUCT
-    ######################################################################
-    @app.route("/products/<int:product_id>", methods=["DELETE"])
-    def delete_products(product_id):
-        """
-        Delete a Product
+    def test_delete_product(self):
+        """It should Delete a Product"""
+        products = self._create_products(5)
+        product_count = self.get_product_count()
+        test_product = products[0]
+        response = self.client.delete(f"{BASE_URL}/{test_product.id}")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(len(response.data), 0)
+        # make sure they are deleted
+        response = self.client.get(f"{BASE_URL}/{test_product.id}")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        new_count = self.get_product_count()
+        self.assertEqual(new_count, product_count - 1)
 
-        This endpoint will delete a Product based the id specified in the path
-        """
-        app.logger.info("Request to Delete a product with id [%s]", product_id)
+    def test_query_by_name(self):
+        """It should Query Products by name"""
+        products = self._create_products(5)
+        test_name = products[0].name
+        name_count = len([product for product in products if product.name == test_name])
+        response = self.client.get(
+            f"{BASE_URL}", query_string=f"name={quote_plus(test_name)}"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        product = Product.find(product_id)
-        if product:
-            product.delete()
-
-        return "", status.HTTP_204_NO_CONTENT 
-
-    ######################################################################
-    # LIST PRODUCTS
-    ######################################################################
-    @app.route("/products", methods=["GET"])
-    def list_products():
-        """Returns a list of Products"""
-        app.logger.info("Request to list Products...")
-
-        products = []
-        name = request.args.get('name')
+        data = response.get_json()
+        self.assertEqual(len(data), name_count)
         
-        if name:
-            app.logger.info("Find by name: %s", name)
-            products = Product.find_by_name(name)
-        else:
-            app.logger.info("Find all")
-            products = Product.all()
+        for product in data:
+            self.assertEqual(product["name"], test_name)
+
+    def test_query_by_category(self):
+        """It should Query Products by category"""
+        products = self._create_products(10)
+        # retrieves the category of the first product in the products list and assigns it to the variable category
+        category = products[0].category
+        # create a list named found, containing products from the products list whose category matches the category variable
+        found = [product for product in products if product.category == category]
+        # check the count of products match the specified category and assign it to the variable found_count
+        count_product = len(found)
+        # Log a debug message indicating the count and details of the products found
+        # send an HTTP GET request to the URL specified by the BASE_URL variable, along with a query parameter "category"
         
-        results = [product.serialize() for product in products]
-        app.logger.info("[%s] Products returned", len(results))
-        return results, status.HTTP_200_OK
+        # assert that response status code is 200, indicating a successful request (HTTP 200 OK)
+        # retrieve the JSON data from the response
+        # assert that the length of the data list (i.e., the number of products returned in the response) is equal to found_count
+        # use a for loop to check each product in the data list and verify that all returned products belong to the queried category
+
+    ######################################################################
+    # Utility functions
+    ######################################################################
+
+    def get_product_count(self):
+        """save the current number of products"""
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        # logging.debug("data = %s", data)
+        return len(data)
+
+
 

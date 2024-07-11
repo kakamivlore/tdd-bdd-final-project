@@ -121,10 +121,6 @@ def get_products(product_id):
     return product.serialize(), status.HTTP_200_OK
 
 ######################################################################
-# U P D A T E   A   P R O D U C T
-######################################################################
-
-######################################################################
 # UPDATE AN EXISTING PRODUCT
 ######################################################################
 @app.route("/products/<int:product_id>", methods=["PUT"])
@@ -146,40 +142,59 @@ def update_products(product_id):
     product.update()
     return product.serialize(), status.HTTP_200_OK
 
-    #
-    # PLACE YOUR CODE TO DELETE A PRODUCT HERE
-    #
-    def test_delete_product(self):
-        """It should Delete a Product"""
-        products = self._create_products(5)
-        product_count = self.get_product_count()
-        test_product = products[0]
-        response = self.client.delete(f"{BASE_URL}/{test_product.id}")
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(len(response.data), 0)
-        # make sure they are deleted
-        response = self.client.get(f"{BASE_URL}/{test_product.id}")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        new_count = self.get_product_count()
-        self.assertEqual(new_count, product_count - 1)
+    ######################################################################
+    # DELETE A PRODUCT
+    ######################################################################
+    @app.route("/products/<int:product_id>", methods=["DELETE"])
+    def delete_products(product_id):
+        """
+        Delete a Product
 
+        This endpoint will delete a Product based the id specified in the path
+        """
+        app.logger.info("Request to Delete a product with id [%s]", product_id)
+
+        product = Product.find(product_id)
+        if product:
+            product.delete()
+
+        return "", status.HTTP_204_NO_CONTENT 
+
+    ######################################################################
+    # LIST PRODUCTS
+    ######################################################################
+    @app.route("/products", methods=["GET"])
+    def list_products():
+        """Returns a list of Products"""
+        app.logger.info("Request to list Products...")
+
+        products = []
+        name = request.args.get("name")
+
+        if name:
+            app.logger.info("Find by name: %s", name)
+            products = Product.find_by_name(name)
+        else:
+            app.logger.info("Find all")
+            products = Product.all()
+
+        results = [product.serialize() for product in products]
+        app.logger.info("[%s] Products returned", len(results))
+        return results, status.HTTP_200_OK
 
     def test_query_by_name(self):
         """It should Query Products by name"""
         products = self._create_products(5)
         test_name = products[0].name
         name_count = len([product for product in products if product.name == test_name])
-        
         response = self.client.get(
             BASE_URL, query_string=f"name={quote_plus(test_name)}"
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-
         data = response.get_json()
         self.assertEqual(len(data), name_count)
-        
+        # check the data just to be sure
         for product in data:
             self.assertEqual(product["name"], test_name)
-
 
 
