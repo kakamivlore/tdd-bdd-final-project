@@ -188,6 +188,7 @@ class TestProductRoutes(TestCase):
         test_product = ProductFactory()
         response = self.client.post(f"{BASE_URL}", json=test_product.serialize())
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
         # UPDATE THE PRODUCT
         new_product = response.get_json()
         new_product["description"] = "unknown"
