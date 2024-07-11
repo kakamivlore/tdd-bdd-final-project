@@ -170,10 +170,22 @@ def update_products(product_id):
 
         products = []
         name = request.args.get("name")
+        category = request.args.get("category")
+        available = request.args.get("available")
 
         if name:
             app.logger.info("Find by name: %s", name)
             products = Product.find_by_name(name)
+        elif category:
+            app.logger.info("Find by category: %s", category)
+            # create enum from string
+            category_value = getattr(Category, category.upper())
+            products = Product.find_by_category(category_value)
+        elif available:
+            app.logger.info("Find by available: %s", available)
+            # create bool from string
+            available_value = available.lower() in ["true", "yes", "1"]
+            products = Product.find_by_availability(available_value)
         else:
             app.logger.info("Find all")
             products = Product.all()
@@ -182,19 +194,5 @@ def update_products(product_id):
         app.logger.info("[%s] Products returned", len(results))
         return results, status.HTTP_200_OK
 
-    def test_query_by_name(self):
-        """It should Query Products by name"""
-        products = self._create_products(5)
-        test_name = products[0].name
-        name_count = len([product for product in products if product.name == test_name])
-        response = self.client.get(
-            BASE_URL, query_string=f"name={quote_plus(test_name)}"
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        data = response.get_json()
-        self.assertEqual(len(data), name_count)
-        # check the data just to be sure
-        for product in data:
-            self.assertEqual(product["name"], test_name)
 
 
